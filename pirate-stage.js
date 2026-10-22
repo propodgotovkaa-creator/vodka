@@ -41,7 +41,13 @@ for(const id of order){const b=document.createElement('button');b.className='wor
 b.onclick=()=>{const r=b.getBoundingClientRect();submitCoin(id,{x:r.left+r.width/2,y:r.top+r.height/2})};
 }
 }
+function fitPirateStage(){
+const bounds=document.querySelector('main').getBoundingClientRect();
+pirateStage.style.setProperty('--pirate-scale',Math.min(bounds.width/1600,bounds.height/900));
+}
+addEventListener('resize',fitPirateStage);
 function startPirateStage(){
+fitPirateStage();
 Object.assign(pirateGame,{index:0,used:new Set(),locked:false,done:false});
 document.querySelector('.stage').hidden=true;pirateStage.hidden=false;
 document.getElementById('pirate-final').hidden=true;sentenceCard.hidden=false;coinBank.hidden=false;document.querySelector('.pirate-bottom').hidden=false;document.getElementById('pirate-instruction').hidden=false;
