@@ -145,5 +145,5 @@ ctx.restore();
 drawTreasureOverlay();
 }
 function tick(now){const dt=last?Math.min((now-last)/1000,.04):0;last=now;if(treasure.phase!=='pirate')draw(dt);requestAnimationFrame(tick)}
-Promise.all(['body','propeller','flag','mine','fish','fish-blue','fish-striped','chest-closed','chest-open','coins-hd-1','coins-hd-2','coins-hd-3','pirate','pirate-body','pirate-arm','parchment',...segmentNames].map(load)).then(()=>{fitOcean();const start=document.getElementById('start-adventure');start.disabled=false;start.textContent='Начать путешествие';if(new URLSearchParams(location.search).get('stage')==='sentences')setTreasurePhase('pirate');else showIntro();requestAnimationFrame(tick)}).catch(e=>{document.getElementById('error').textContent=e.message});
+Promise.all(['body','propeller','flag','mine','fish','fish-blue','fish-striped','chest-closed','chest-open','coins-hd-1','coins-hd-2','coins-hd-3','pirate','pirate-body','pirate-arm','parchment',...segmentNames].map(load)).then(()=>{fitOcean();const start=document.getElementById('start-adventure');start.disabled=false;start.style.visibility='visible';if(new URLSearchParams(location.search).get('stage')==='sentences')setTreasurePhase('pirate');else showIntro();requestAnimationFrame(tick)}).catch(e=>{document.getElementById('error').textContent=e.message});
 </script></html>
