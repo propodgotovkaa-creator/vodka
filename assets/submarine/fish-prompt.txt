@@ -1,0 +1,3 @@
+Built-in imagegen, transparent_background=true. Output: fish.png
+
+One single small tropical reef fish game sprite on truly transparent background. Side view facing LEFT, entire fish visible with generous transparent margin. Cheerful elegant orange-gold fish with turquoise fin accents, small natural friendly eye, delicate fins and forked tail, compact oval body. Rich polished hand-painted 2D cartoon children's underwater adventure art matching bright turquoise coral reef and golden pirate submarine. Clear readable silhouette even at 40 pixels wide. Not a huge baby eye, not a character with human expressions. No other fish, no bubbles, no water, no text, no ground, no glow or shadow outside silhouette. Landscape composition.

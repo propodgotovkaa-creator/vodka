@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пиратские сокровища — подводная экспедиция</title>
+<link rel="stylesheet" href="pirate-stage.css">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#062e43;color:#e6fbff;font-family:system-ui,sans-serif}main{max-width:1440px;margin:auto;padding:20px}header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}h1{font-size:20px;margin:0}p{margin:5px 0;color:#a5d9df;font-size:14px}.stage{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:20px;background:#047eab;box-shadow:0 20px 60px #001c32}canvas{display:block;width:100%;height:100%;touch-action:none}button{cursor:pointer;border:1px solid #73d9df80;background:#075269;color:#edffff;border-radius:14px;font:600 15px system-ui;min-height:46px;padding:10px 18px}button:hover,button[aria-pressed=true]{background:#14859a}button:focus-visible{outline:3px solid #ffdb70;outline-offset:3px}.controls{position:absolute;bottom:20px;left:20px;display:grid;grid-template-columns:repeat(3,52px);gap:6px}.controls button{padding:0;height:50px;background:#047186db;border:2px solid #7de8e7a0;font-size:26px;touch-action:none;user-select:none}.up{grid-column:2}.left{grid-column:1}.down{grid-column:2}.right{grid-column:3}.status{position:absolute;top:18px;left:20px;padding:9px 14px;background:#064e65c9;border-radius:30px;font-size:13px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}#error{color:#ffe4a0}@media(max-width:600px){main{padding:10px}header{align-items:flex-start;flex-direction:column}h1{font-size:18px}.controls{bottom:10px;left:10px;grid-template-columns:repeat(3,44px);gap:3px}.controls button{height:44px}.status{top:10px;left:10px;font-size:11px}.stage{border-radius:12px}}
+[hidden]{display:none!important}.treasure-count{position:absolute;right:18px;top:16px;padding:10px 18px;border:2px solid #e2b54d;background:#064e65e8;border-radius:30px;color:#ffe38e;font-size:20px;font-weight:700;pointer-events:none}.treasure-action{position:absolute;background:transparent!important;border:0;padding:0;min-height:44px;border-radius:50%;cursor:pointer}.treasure-action:focus-visible{outline:4px solid #ffe794;outline-offset:5px}.finish{position:absolute;inset:20% 12%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:#073b51f5;border:2px solid #efc862;border-radius:28px;padding:20px;box-shadow:0 0 70px #ffc95655}.finish h2{font-size:clamp(18px,3vw,34px);color:#ffe08a}.finish p{color:#f6e7bd}.finish button{background:#b87818;color:#fff7da;margin-top:16px}button:disabled{opacity:.4;cursor:default}@media(max-width:600px){.treasure-count{right:8px;top:8px;font-size:13px;padding:6px 10px}.finish{inset:8% 5%;padding:8px}.finish h2{margin:4px}.finish p{margin:4px}.finish button{margin-top:5px}}
+</style>
+<main><header><div><h1>Подводная экспедиция</h1><p>Плывём вправо · управление стрелками, WASD или кнопками</p></div><div class="toolbar"><button id="pause" aria-pressed="false">Пауза</button><button id="lamp" aria-pressed="true">Фонарь</button><button id="reset">В центр</button><button id="zone">Следующий участок</button></div></header>
+<div class="stage"><canvas id="ocean" width="1600" height="900" aria-label="Анимированная пиратская подводная лодка в океане"></canvas><span class="status" id="status" role="status">Подготовка к погружению…</span><div class="controls" aria-label="Управление лодкой"><button class="up" data-key="up" aria-label="Вверх">↑</button><button class="left" data-key="left" aria-label="Влево">←</button><button class="down" data-key="down" aria-label="Вниз">↓</button><button class="right" data-key="right" aria-label="Вправо">→</button></div></div><p id="error" role="alert"></p></main>
+<script>
+document.querySelector('.stage').insertAdjacentHTML('beforeend','<span class="treasure-count" role="status" aria-label="Собрано монет"><span aria-hidden="true">🪙 </span><span id="treasure-count">0 / 15</span></span><button id="treasure-action" class="treasure-action" aria-label="Открыть сундук" hidden></button><section id="finish" class="finish" hidden><h2>Все пиратские сокровища найдены!</h2><p>Собраны все 15 монет</p><button id="again">Играть ещё</button></section>');
+</script>
+<script src="treasures.js"></script>
+<script src="pirate-stage.js"></script>
+<script src="pirate-animation.js"></script>
+<script>
+const canvas=document.getElementById('ocean'),ctx=canvas.getContext('2d');
+const W=1600,H=900,keys=new Set(),pointerKeys=new Map();
+let boat={x:720,y:420,vx:0,vy:0},time=0,last=0,paused=matchMedia('(prefers-reduced-motion: reduce)').matches,light=true,spawn=0,particles=[],camera=0,propAngle=0;
+const segmentNames=['reef','rocks','wreck','cave'],zoneNames=['Коралловый риф','Скалы','Затонувший корабль','Жемчужный грот'];
+const segmentStep=1200,overlap=W-segmentStep,masked=[];
+let protection=0,shake=0,hitCount=0,burst=[];
+const touchedMines=new Map(),mineSpacing=680,mineStart=1250;
+const mineHeights=[325,650,455,250,610,390,665,500];
+function visibleMines(){
+const result=[];
+const first=Math.max(0,Math.floor((camera-mineStart-180)/mineSpacing));
+const last=Math.ceil((camera+W+180-mineStart)/mineSpacing);
+for(let id=first;id<=last;id++){
+if(!clearOfChest(mineStart+id*mineSpacing))continue;
+const hanging=id%3!==1,baseX=mineStart+id*mineSpacing-camera;
+const phase=time*.7+id*1.9,angle=Math.sin(phase)*.075;
+const baseY=mineHeights[id%mineHeights.length];
+const length=baseY+60-70;
+result.push({id,hanging,anchorX:baseX,x:baseX+(hanging?Math.sin(angle)*length:Math.sin(phase)*14),y:hanging?-60+Math.cos(angle)*length+70:baseY+Math.sin(phase)*20,angle:hanging?-angle:Math.sin(phase)*.05});
+}
+return result;
+}
+function mineTouchesBoat(m){
+// Forgiving hull hitbox; decorative flag, light and rope cannot cause a hit.
+return ((m.x-(boat.x+20))/214)**2+((m.y-(boat.y+24))/130)**2<1;
+}
+function updateMines(dt){
+protection=Math.max(0,protection-dt);shake=Math.max(0,shake-dt);
+for(const m of visibleMines())if(!protection&&!touchedMines.has(m.id)&&mineTouchesBoat(m)){
+touchedMines.set(m.id,time);protection=1.2;shake=.4;hitCount++;
+for(let i=0;i<26;i++){const a=Math.random()*Math.PI*2,s=55+Math.random()*110;burst.push({x:m.x+camera,y:m.y,r:5+Math.random()*13,vx:Math.cos(a)*s,vy:Math.sin(a)*s-35,age:0})}
+break;
+}
+for(const p of burst){p.age+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy-=dt*28}
+burst=burst.filter(p=>p.age<1.6);
+for(const id of touchedMines.keys())if(mineStart+id*mineSpacing<camera-250)touchedMines.delete(id);
+}
+function drawMines(){
+for(const m of visibleMines()){
+const hitAt=touchedMines.get(m.id),fade=hitAt===undefined?1:Math.max(0,1-(time-hitAt)/.45);
+if(!fade)continue;
+ctx.save();ctx.globalAlpha=fade;
+if(m.hanging){
+ctx.lineCap='round';ctx.beginPath();ctx.moveTo(m.anchorX,-60);ctx.quadraticCurveTo((m.anchorX+m.x)/2+Math.sin(time+m.id)*6,m.y*.45,m.x,m.y-70);
+ctx.strokeStyle='#533b27';ctx.lineWidth=8;ctx.stroke();ctx.strokeStyle='#caa977';ctx.lineWidth=5;ctx.stroke();ctx.setLineDash([3,7]);ctx.strokeStyle='#f3d39b';ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([]);
+}
+ctx.translate(m.x,m.y);ctx.rotate(m.angle);ctx.drawImage(images.mine,-84,-84,168,168);ctx.restore();
+}
+for(const p of burst)bubble(p.x-camera,p.y,p.r*(1+p.age*.4),Math.max(0,.85-p.age/1.6));
+}
+function zoneLabel(){return zoneNames[Math.floor((camera+W/2)/segmentStep)%4]}
+function updateStatus(){const text=paused?'Погружение на паузе':zoneLabel();const node=document.getElementById('status');if(node.textContent!==text)node.textContent=text}
+const pauseButton=document.getElementById('pause');
+function syncPause(){pauseButton.textContent=paused?'Продолжить':'Пауза';pauseButton.setAttribute('aria-pressed',String(paused));updateStatus()}
+pauseButton.onclick=()=>{paused=!paused;keys.clear();pointerKeys.clear();syncPause()};
+document.getElementById('lamp').onclick=e=>{light=!light;e.currentTarget.setAttribute('aria-pressed',String(light))};
+document.getElementById('reset').onclick=()=>{boat={x:720,y:420,vx:0,vy:0};particles=[];protection=1.2;shake=0};
+document.getElementById('zone').textContent='К сундуку';
+document.getElementById('zone').onclick=()=>{if(treasure.phase!=='travel')return;camera=Math.max(camera,chestWorld(treasure.index)-boat.x-320);protection=1.2;burst=[];updateStatus()};
+const mapping={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
+addEventListener('keydown',e=>{if(treasure.phase==='pirate')return;if(mapping[e.code]){e.preventDefault();keys.add(mapping[e.code])}});
+addEventListener('keyup',e=>{if(mapping[e.code]){e.preventDefault();keys.delete(mapping[e.code])}});
+addEventListener('blur',()=>{keys.clear();pointerKeys.clear()});
+document.addEventListener('visibilitychange',()=>{keys.clear();pointerKeys.clear();last=0});
+document.querySelectorAll('[data-key]').forEach(button=>{
+button.onpointerdown=e=>{e.preventDefault();button.setPointerCapture(e.pointerId);pointerKeys.set(e.pointerId,button.dataset.key)};
+button.onpointerup=button.onpointercancel=button.onlostpointercapture=e=>pointerKeys.delete(e.pointerId);
+});
+const images={};
+function load(name){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{images[name]=im;resolve()};im.onerror=()=>reject(new Error('Не удалось загрузить '+name+'.png'));im.src='assets/submarine/'+name+'.png'})}
+function prepareSegments(){
+for(const name of segmentNames){const tile=document.createElement('canvas');tile.width=W;tile.height=H;const c=tile.getContext('2d');c.drawImage(images[name],0,0,W,H);c.globalCompositeOperation='destination-in';const fade=c.createLinearGradient(0,0,overlap,0);fade.addColorStop(0,'rgba(0,0,0,0)');fade.addColorStop(1,'rgba(0,0,0,1)');c.fillStyle=fade;c.fillRect(0,0,W,H);masked.push(tile)}
+}
+function drawWorld(){
+// Spatial overlap, not a time-based slideshow: landmarks keep moving to the left.
+const start=Math.floor(camera/segmentStep)-1;
+for(let i=start;i<=start+3;i++){const index=((i%4)+4)%4;ctx.drawImage(i===start?images[segmentNames[index]]:masked[index],i*segmentStep-camera,0,W,H)}
+// A slower translucent light layer adds depth without moving the painted seabed twice.
+ctx.save();ctx.globalCompositeOperation='screen';
+for(let i=0;i<5;i++){const x=((i*480-camera*.22)%2400+2400)%2400-400;const lightRay=ctx.createLinearGradient(x,0,x+180,H);lightRay.addColorStop(0,'#7bfff90b');lightRay.addColorStop(1,'#7bfff900');ctx.fillStyle=lightRay;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+70,0);ctx.lineTo(x+330,H);ctx.lineTo(x+120,H);ctx.fill()}
+ctx.restore();
+}
+function bubble(x,y,r,alpha){ctx.save();ctx.globalAlpha=alpha;const g=ctx.createRadialGradient(x-r*.3,y-r*.4,0,x,y,r);g.addColorStop(0,'#e8ffff88');g.addColorStop(.5,'#7ce9ff12');g.addColorStop(1,'#b5ffff77');ctx.fillStyle=g;ctx.strokeStyle='#d8ffffaa';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore()}
+const fishSchools=[{x:350,y:235,count:3,size:48,speed:-125,depth:.45,sprite:'fish'},{x:1150,y:535,count:3,size:58,speed:-165,depth:.7,sprite:'fish-blue'},{x:1450,y:355,count:2,size:58,speed:-105,depth:.5,sprite:'fish-striped'},{x:2100,y:625,count:2,size:42,speed:-140,depth:.35,sprite:'fish'}];
+function fishPositions(){
+const fish=[];
+fishSchools.forEach((school,s)=>{
+const cycle=2400;
+const schoolX=((school.x+time*school.speed-camera*school.depth+350)%cycle+cycle)%cycle-350;
+for(let i=0;i<school.count;i++)fish.push({x:schoolX+i*58,y:school.y+Math.sin(time*.9+s)*12+(i%2?23:-8)+Math.sin(time*1.7+i)*5,size:school.size-i*3,phase:time*5+i+s,dir:school.speed>0?-1:1,alpha:.55+school.depth*.4,sprite:school.sprite});
+});return fish;
+}
+function drawFish(){
+for(const f of fishPositions()){
+if(f.x< -80||f.x>W+80)continue;
+ctx.save();ctx.globalAlpha=f.alpha;ctx.translate(f.x,f.y);ctx.scale(f.dir,1);ctx.rotate(Math.sin(f.phase*.35)*.035);
+// Gentle travelling bend increases toward the tail; adjacent strips remain joined.
+const im=images[f.sprite],n=28,sw=im.width/n,h=f.size*im.height/im.width;
+for(let strip=0;strip<n;strip++){const t=strip/n,dy=Math.sin(f.phase-t*3)*Math.max(0,t-.4)*h*.11;ctx.drawImage(im,strip*sw,0,sw,im.height,-f.size/2+strip*f.size/n,-h/2+dy,f.size/n+.4,h)}
+ctx.restore();
+}
+}
+function draw(dt){
+if(!paused){time+=dt;
+if(treasure.phase==='travel'){
+const held=new Set([...keys,...pointerKeys.values()]);let ax=Number(held.has('right'))-Number(held.has('left')),ay=Number(held.has('down'))-Number(held.has('up'));const norm=Math.hypot(ax,ay)||1;const blend=1-Math.exp(-dt*5);boat.vx+=(ax/norm*260-boat.vx)*blend;boat.vy+=(ay/norm*220-boat.vy)*blend;boat.x=Math.max(235,Math.min(W-245,boat.x+boat.vx*dt));boat.y=Math.max(205,Math.min(H-180,boat.y+boat.vy*dt));spawn+=dt;
+camera+=dt*(75+Math.max(0,boat.vx)*.35);propAngle+=dt*(Math.hypot(boat.vx,boat.vy)>30?27:15);updateStatus();
+updateMines(dt);
+}
+updateTreasure(dt);
+if(spawn>.12){spawn=0;particles.push({x:boat.x-184,y:boat.y+25,r:4+Math.random()*9,life:0,v:35+Math.random()*60})}
+for(const p of particles){p.life+=dt;p.x-=p.v*dt;p.y-=dt*(20+p.life*14)}particles=particles.filter(p=>p.life<4)}
+ctx.clearRect(0,0,W,H);drawWorld();
+drawFish();
+drawMines();
+drawChests();
+for(let i=0;i<24;i++){const y=H-((time*(13+i%5*4)+i*119)%1000);bubble(((i*193-camera*1.3)%1800+1800)%1800-100+Math.sin(time*.5+i)*14,y,2+i%4,.2)}
+for(const p of particles)bubble(p.x,p.y,p.r*(1+p.life*.12),Math.max(0,.7-p.life*.175));
+ctx.save();ctx.translate(boat.x+(shake?Math.sin(time*70)*shake*14:0),boat.y+Math.sin(time*1.8)*7);ctx.rotate(Math.sin(time*1.3)*.017+boat.vy*.00012+(shake?Math.sin(time*55)*shake*.07:0));
+if(protection>0)ctx.globalAlpha=.75+.25*Math.sin(time*12)**2;
+if(light){const g=ctx.createLinearGradient(185,20,680,20);g.addColorStop(0,'#fff3b177');g.addColorStop(1,'#fff3b100');ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(180,20);ctx.lineTo(680,-85);ctx.quadraticCurveTo(730,20,680,125);ctx.closePath();ctx.fill()}
+ctx.save();ctx.translate(-107,-166);ctx.transform(1,0,Math.sin(time*3.5)*.045,1,0,0);ctx.drawImage(images.flag,0,0,112,112);ctx.restore();
+ctx.drawImage(images.body,-215,-143.33,430,286.67);
+ctx.save();ctx.translate(-177,20);ctx.scale(.37,1);ctx.rotate(propAngle);ctx.drawImage(images.propeller,-64,-64,128,128);ctx.restore();
+ctx.restore();
+drawTreasureOverlay();
+}
+function tick(now){const dt=last?Math.min((now-last)/1000,.04):0;last=now;if(treasure.phase!=='pirate')draw(dt);requestAnimationFrame(tick)}
+Promise.all(['body','propeller','flag','mine','fish','fish-blue','fish-striped','chest-closed','chest-open','coins-v2','coins-original','coin-balloon','pirate','pirate-body','pirate-arm','parchment',...segmentNames].map(load)).then(()=>{prepareSegments();syncPause();if(new URLSearchParams(location.search).get('stage')==='sentences')setTreasurePhase('pirate');requestAnimationFrame(tick)}).catch(e=>{document.getElementById('status').textContent='Изображения не загрузились';document.getElementById('error').textContent=e.message});
+</script></html>
