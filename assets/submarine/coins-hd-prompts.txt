@@ -1,0 +1,6 @@
+Created with built-in imagegen, 22 October 2026. Three 1536x1024 sprite sheets, five illustrated coins each, sixth cell unused. Crop diameter 478 pixels, previously 288.
+
+Prompt: Clean educational game illustration sprite sheet, 3 columns x 2 rows. Large circular gold tokens with riveted rims and cream interiors. Crisp detailed colorful children's illustrations. No text. All circles fully separated.
+Sheet 1: rose, crab with two claws, seashell, fully clothed mermaid in purple shirt, rainbow.
+Sheet 2: drum, corn, open pea pod, crown, red corals.
+Sheet 3: hot air balloon with basket, cheese, axe, mosquito, golden samovar.
