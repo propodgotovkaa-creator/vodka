@@ -46,7 +46,7 @@ function drawChests(){
 for(let i=Math.max(0,treasure.index-1);i<Math.min(15,treasure.index+2);i++){
 const x=chestWorld(i)-camera;if(x< -200||x>W+200)continue;
 const active=i===treasure.index,opened=i<treasure.index||['coin','collecting','complete'].includes(treasure.phase);
-if(active)glow(x,H-165,155,.6+Math.sin(time*2)*.12);
+
 const opening=active&&treasure.phase==='opening'?ease(treasure.t/.85):opened?1:0;
 ctx.save();ctx.globalAlpha=1-opening;ctx.drawImage(images['chest-closed'],x-140,H-335,280,280);ctx.globalAlpha=opening;ctx.drawImage(images['chest-open'],x-140,H-335,280,280);ctx.restore();
 if(active&&treasure.phase==='ready'){
@@ -72,7 +72,7 @@ if(['opening','coin','collecting'].includes(phase)){
 let x=800,y=H/2-20,r=255,spin=1,veil=.28;
 if(phase==='opening'){
 const p=ease((treasure.t-.55)/1.45);x=(chestWorld(treasure.index)-camera)*(1-p)+800*p;y=(H-200)*(1-p)+(H/2-20)*p;r=32+223*p;spin=.25+.75*Math.abs(Math.cos((1-p)*Math.PI*2));veil*=p;
-if(treasure.t<.55){glow(chestWorld(treasure.index)-camera,H-200,180,treasure.t);return}
+if(treasure.t<.55)return;
 }else if(phase==='collecting'){
 const p=ease(treasure.t/.85);x=800+(1480-800)*p;y=(H/2-20)+(60-(H/2-20))*p-Math.sin(p*Math.PI)*110;r=255+(23-255)*p;veil*=1-p;
 }
